@@ -1,5 +1,1 @@
-﻿# 07 - UI UX GUIDELINES
-- Filament default theme, no custom CSS in Phase 1.
-- All lists must have search + filter.
-- Empty states must have CTA: "Create first account".
-- Language: English for code, UI English for now.
+# 07 - UI UX - Filament default theme, Every list search+filter, Empty state with CTA, Status colors gray blue green red

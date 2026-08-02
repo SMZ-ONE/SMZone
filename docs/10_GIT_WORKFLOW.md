@@ -1,7 +1,1 @@
-﻿# 10 - GIT WORKFLOW
-- main = production ready.
-- feat: new feature
-- fix: bugfix
-- docs: documentation
-- Commit after every sprint.
-- Push after every commit.
+# 10 - GIT - main production ready, feat fix docs refactor chore, Push after every commit, Tag after Phase
