@@ -1,16 +1,25 @@
 <?php
-
 namespace App\Filament\Resources\Products\Schemas;
 
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
 class ProductForm
 {
     public static function configure(Schema $schema): Schema
     {
-        return $schema
-            ->components([
-                //
-            ]);
+        return $schema->components([
+            TextInput::make('name')->required()->maxLength(255),
+            TextInput::make('sku')->label('SKU')->unique(ignoreRecord:true),
+            Textarea::make('description')->rows(4)->columnSpanFull(),
+            TextInput::make('price')->numeric()->prefix('€'),
+            FileUpload::make('image')->image()->directory('products'),
+            TagsInput::make('tags'),
+            Toggle::make('is_active')->default(true),
+        ]);
     }
 }
