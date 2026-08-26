@@ -1,7 +1,7 @@
 <?php
-
 namespace App\Filament\Resources\SocialAccounts\Schemas;
 
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -12,20 +12,42 @@ class SocialAccountForm
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
-            Select::make('user_id')
-                ->relationship('user', 'name')
-                ->default(auth()->id())
-                ->required(),
-            Select::make('provider')
+            Select::make('platform')
                 ->options([
-                    'facebook' => 'Facebook',
                     'instagram' => 'Instagram',
+                    'facebook' => 'Facebook',
+                    'tiktok' => 'TikTok',
                 ])
-                ->required(),
-            TextInput::make('account_name')->label('Page Name')->required(),
-            TextInput::make('username'),
-            TextInput::make('account_id')->label('Account ID'),
-            Toggle::make('is_active')->default(true),
+                ->required()
+                ->native(false)
+                ->prefixIcon('heroicon-o-globe-alt'),
+
+            TextInput::make('username')
+                ->required()
+                ->prefix('@')
+                ->maxLength(255),
+
+            TextInput::make('provider_id')
+                ->label('Provider ID')
+                ->placeholder('123456789')
+                ->helperText('Platformdan gelen ID'),
+
+            FileUpload::make('avatar')
+                ->image()
+                ->avatar()
+                ->directory('avatars')
+                ->disk('public'),
+
+            TextInput::make('access_token')
+                ->password()
+                ->revealable()
+                ->columnSpanFull()
+                ->helperText('Token güvenli saklanır'),
+
+            Toggle::make('is_connected')
+                ->label('Connected')
+                ->default(false)
+                ->inline(false),
         ]);
     }
 }
