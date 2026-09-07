@@ -19,9 +19,9 @@ class ProductResource extends Resource
 {
     protected static ?string $model = Product::class;
 
-    protected static string|UnitEnum|null $navigationGroup = 'SMZone';
+    protected static string|UnitEnum|null $navigationGroup = 'SMZ ONE - Content';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 3;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingBag;
 

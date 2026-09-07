@@ -19,7 +19,7 @@ class SocialAccountResource extends Resource
 {
     protected static ?string $model = SocialAccount::class;
 
-    protected static string|UnitEnum|null $navigationGroup = 'SMZone';
+    protected static string|UnitEnum|null $navigationGroup = 'SMZ ONE - Settings';
 
     protected static ?int $navigationSort = 2;
 

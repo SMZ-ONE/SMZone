@@ -19,7 +19,7 @@ class ContentForm
                 ->prefixIcon('heroicon-o-at-symbol')
                 ->searchable()
                 ->preload()
-                ->required(),
+                ->nullable(),
 
             Select::make('product_id')
                 ->relationship('product', 'name')
@@ -29,12 +29,14 @@ class ContentForm
                 ->preload()
                 ->nullable(),
 
+            // ContentStatus enum'daki gerçek değerlerle uyumlu (draft/scheduled/published/archived).
+            // Not: eski versiyonda 'failed' vardı ama enum'da böyle bir case yok.
             Select::make('status')
                 ->options([
                     'draft' => 'Draft',
                     'scheduled' => 'Scheduled',
                     'published' => 'Published',
-                    'failed' => 'Failed',
+                    'archived' => 'Archived',
                 ])
                 ->default('draft')
                 ->required()
@@ -46,6 +48,7 @@ class ContentForm
                     'facebook' => 'Facebook',
                     'tiktok' => 'TikTok',
                 ])
+                ->required()
                 ->native(false),
 
             TextInput::make('title')
@@ -53,8 +56,10 @@ class ContentForm
                 ->placeholder('e.g. New Year Campaign')
                 ->columnSpanFull(),
 
-            Textarea::make('caption')
-                ->rows(4)
+            // ContentItem modelindeki gerçek kolon adı 'body' - 'caption' değil.
+            Textarea::make('body')
+                ->label('Caption + Hashtags')
+                ->rows(6)
                 ->columnSpanFull()
                 ->placeholder('Write your caption with #hashtags...'),
 

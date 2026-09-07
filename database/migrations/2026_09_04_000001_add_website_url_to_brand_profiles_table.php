@@ -6,22 +6,17 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::create('contents', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+        Schema::table('brand_profiles', function (Blueprint $table) {
+            $table->string('website_url')->nullable()->after('name');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('contents');
+        Schema::table('brand_profiles', function (Blueprint $table) {
+            $table->dropColumn('website_url');
+        });
     }
 };

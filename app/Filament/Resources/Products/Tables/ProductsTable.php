@@ -17,27 +17,28 @@ class ProductsTable
             ->columns([
                 ImageColumn::make('image')
                     ->circular()
-                    ->defaultImageUrl(fn($r) => 'https://ui-avatars.com/api/?name='.urlencode($r->name ?? 'P').'&background=random'),
+                    ->defaultImageUrl(fn() => 'https://ui-avatars.com/api/?name=P&background=f59e0b&color=fff'),
 
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    ->description(fn($record) => $record->sku ? 'SKU: '.$record->sku : null),
+                    ->description(fn($record) => 'SKU: ' . $record->sku)
+                    ->limit(30),
 
                 TextColumn::make('price')
                     ->money('EUR')
                     ->sortable()
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->color('success'),
 
                 TextColumn::make('sku')
+                    ->label('SKU')
                     ->badge()
                     ->color('gray')
-                    ->searchable()
-                    ->toggleable(),
+                    ->searchable(),
 
                 TextColumn::make('stock')
-                    ->label('Stock')
                     ->sortable()
                     ->badge()
                     ->color(fn($state) => $state > 10 ? 'success' : ($state > 0 ? 'warning' : 'danger')),
@@ -49,34 +50,16 @@ class ProductsTable
 
                 IconColumn::make('is_active')
                     ->label('Active')
-                    ->boolean()
-                    ->trueIcon('heroicon-o-check-circle')
-                    ->falseIcon('heroicon-o-x-circle')
-                    ->trueColor('success')
-                    ->falseColor('gray'),
-
-                TextColumn::make('created_at')
-                    ->since()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->boolean(),
             ])
             ->filters([
                 \Filament\Tables\Filters\TernaryFilter::make('is_active')->label('Active'),
-                \Filament\Tables\Filters\SelectFilter::make('tags')->options(['natural'=>'natural','organic'=>'organic','bestseller'=>'bestseller'])->query(function($q, $data){
-                    if(!empty($data['value'])){ $q->where('tags','like','%'.$data['value'].'%'); }
-                    return $q;
-                }),
+                \Filament\Tables\Filters\Filter::make('in_stock')->query(fn($q) => $q->where('stock','>',0))->label('In Stock'),
             ])
-            ->recordActions([
-                EditAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
-            ])
-            ->emptyStateHeading('No products yet')
-            ->emptyStateDescription('Create your first product to start building your catalog.')
+            ->recordActions([ EditAction::make() ])
+            ->toolbarActions([ BulkActionGroup::make([ DeleteBulkAction::make() ]) ])
+            ->emptyStateHeading('No products')
+            ->emptyStateDescription('Add your first natural cosmetic product.')
             ->emptyStateIcon('heroicon-o-shopping-bag');
     }
 }
