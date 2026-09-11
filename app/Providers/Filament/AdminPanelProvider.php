@@ -2,7 +2,6 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Widgets\ContentCalendarWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -45,11 +44,19 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
+                // NOT: ContentCalendarWidget BİLİNÇLİ OLARAK burada değil - dashboard'da
+                // değil, Content bölümünde (ListContentItems sayfasında header widget
+                // olarak) gösteriliyor. Genel dashboard sadece StatsOverview + gerçek
+                // veriyle çalışan kartları içeriyor.
                 \App\Filament\Widgets\StatsOverview::class,
-                ContentCalendarWidget::class,
             ])
             ->plugins([
-                FilamentFullCalendarPlugin::make(),
+                // editable() eklendi - FullCalendar'ın kendi varsayılanı 'false'dur,
+                // bu çağrılmadan sürükle-bırak (drag & drop) HİÇBİR ZAMAN aktif olmaz,
+                // onEventDrop() doğru yazılmış olsa bile. Sürükle-bırağın "çalışmıyor"
+                // görünmesinin asıl sebebi büyük ihtimalle buydu.
+                FilamentFullCalendarPlugin::make()
+                    ->editable(),
             ])
             ->middleware([
                 EncryptCookies::class,

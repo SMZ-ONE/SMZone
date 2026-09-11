@@ -7,70 +7,114 @@ use Saade\FilamentFullCalendar\Widgets\FullCalendarWidget;
 
 class ContentCalendarWidget extends FullCalendarWidget
 {
-    // Bilinçli olarak $model set edilmiyor: bu, paketin kendi create/edit/delete
-    // modal CRUD akışını devre dışı bırakır. Düzenleme her zaman gerçek
-    // ContentItemResource edit sayfasında (Brand/Learning entegrasyonu dahil)
-    // yapılmalı - takvimde ayrı/basit bir ikinci düzenleme formu istemiyoruz,
-    // bu da tam olarak Shopify'da yaşadığımız "iki paralel sistem" hatasını tekrarlardı.
+    // $model set edilmiyor - CRUD modalı yerine gerçek edit sayfasına yönlendiriyoruz.
 
     protected function headerActions(): array
     {
         return [];
     }
 
-    /**
-     * Haftalık/günlük görünüm butonları eklendi - önceden sadece varsayılan ay
-     * görünümü vardı, geçiş yapacak bir buton hiç yoktu.
-     */
     public function config(): array
     {
         return [
-            'firstDay' => 1, // Pazartesi ile başlasın
+            'firstDay' => 1,
             'headerToolbar' => [
-                'left' => 'dayGridMonth,dayGridWeek,dayGridDay',
+                'left' => 'dayGridMonth,timeGridWeek,timeGridDay',
                 'center' => 'title',
                 'right' => 'prev,next today',
+            ],
+            'slotMinTime' => '06:00:00',
+            'slotMaxTime' => '24:00:00',
+            // Varsayılan 30 dk'lık dilimler eklenen etkinlikle sıkışıp görünmez
+            // oluyordu - 1 saatlik dilimlere çıkarıldı, satırlar da mevcut alanı
+            // doldursun diye expandRows açıldı.
+            'slotDuration' => '01:00:00',
+            'slotLabelInterval' => '01:00:00',
+            'expandRows' => true,
+            // 24 saat formatı - DACH/TR konvansiyonuna uygun, AM/PM yok.
+            'slotLabelFormat' => [
+                'hour' => '2-digit',
+                'minute' => '2-digit',
+                'hour12' => false,
+            ],
+            'eventTimeFormat' => [
+                'hour' => '2-digit',
+                'minute' => '2-digit',
+                'hour12' => false,
             ],
         ];
     }
 
-    /**
-     * Görünen tarih aralığındaki ContentItem'ları FullCalendar'ın beklediği
-     * event formatına çevirir. 'url' alanı sayesinde bir etkinliğe tıklanınca
-     * doğrudan gerçek edit sayfasına gidilir - ayrı bir modal/form yok.
-     *
-     * 'extendedProps.image' - küçük önizleme görseli için eklendi (bkz.
-     * eventDidMount()). Şu an ContentItem'ın kendi bir görseli olmadığı için
-     * (media alanı henüz hiçbir yerde doldurulmuyor) ilişkili Product'ın
-     * Shopify görseli fallback olarak kullanılıyor - ürünsüz/manuel girilen
-     * içeriklerde görsel boş kalır, bu normal.
-     */
     public function fetchEvents(array $fetchInfo): array
     {
-        return ContentItem::query()
+        $items = ContentItem::query()
             ->with('product')
             ->whereNotNull('scheduled_at')
             ->whereBetween('scheduled_at', [$fetchInfo['start'], $fetchInfo['end']])
-            ->get()
-            ->map(fn (ContentItem $item) => [
-                'id' => $item->id,
-                'title' => ($item->title ?: 'Untitled').' ('.ucfirst($item->platform).')',
-                'start' => optional($item->scheduled_at)->toIso8601String(),
-                'backgroundColor' => $this->colorForStatus($item->status),
-                'borderColor' => $this->colorForStatus($item->status),
-                'url' => "/admin/contents/content-items/{$item->id}/edit",
-                'extendedProps' => [
-                    'image' => $item->product?->image,
-                ],
-            ])
-            ->toArray();
+            ->get();
+
+        $events = $items->map(fn (ContentItem $item) => [
+            'id' => $item->id,
+            'title' => ($item->title ?: 'Untitled').' ('.ucfirst($item->platform).')',
+            'start' => optional($item->scheduled_at)->toIso8601String(),
+            'backgroundColor' => $this->colorForStatus($item->status),
+            'borderColor' => $this->colorForStatus($item->status),
+            'url' => "/admin/contents/content-items/{$item->id}/edit",
+            'extendedProps' => [
+                'image' => $item->product?->image,
+            ],
+        ])->toArray();
+
+        return array_merge($events, $this->heatmapEvents($items, $fetchInfo));
     }
 
     /**
-     * Etkinliğin yanına küçük bir önizleme görseli (32x32) ekliyor -
-     * extendedProps.image doluysa. FullCalendar'ın resmi "Render Hooks"
-     * mekanizması kullanılıyor (paket dokümantasyonunda önerilen yöntem).
+     * Ay/hafta görünümündeki gün hücrelerini yoğunluğa göre renklendiriyor.
+     * FullCalendar'ın "background event" mekanizması kullanılıyor - ayrı bir
+     * render hook gerekmiyor, normal event feed'e display:'background' ile
+     * eklenen sahte event'ler günün arka planını boyuyor.
      */
+    private function heatmapEvents($items, array $fetchInfo): array
+    {
+        $counts = $items->groupBy(fn (ContentItem $item) => $item->scheduled_at->format('Y-m-d'))->map->count();
+        $max = max(1, $counts->max() ?? 1);
+
+        $cursor = \Illuminate\Support\Carbon::parse($fetchInfo['start'])->startOfDay();
+        $end = \Illuminate\Support\Carbon::parse($fetchInfo['end'])->startOfDay();
+
+        $heatmap = [];
+
+        while ($cursor->lt($end)) {
+            $count = $counts->get($cursor->format('Y-m-d'), 0);
+
+            if ($count > 0) {
+                $level = (int) ceil(($count / $max) * 4);
+                $heatmap[] = [
+                    'start' => $cursor->format('Y-m-d'),
+                    'display' => 'background',
+                    'backgroundColor' => $this->heatmapColor($level),
+                    'allDay' => true,
+                ];
+            }
+
+            $cursor->addDay();
+        }
+
+        return $heatmap;
+    }
+
+    private function heatmapColor(int $level): string
+    {
+        return match ($level) {
+            1 => 'rgba(59,130,246,0.15)',
+            2 => 'rgba(59,130,246,0.30)',
+            3 => 'rgba(59,130,246,0.45)',
+            4 => 'rgba(59,130,246,0.60)',
+            default => 'transparent',
+        };
+    }
+
+    // Küçük önizleme görseli - extendedProps.image doluysa (product'tan geliyor)
     public function eventDidMount(): string
     {
         return <<<'JS'
@@ -98,30 +142,18 @@ class ContentCalendarWidget extends FullCalendarWidget
         JS;
     }
 
-    /**
-     * Takvimde bir etkinlik sürüklenip başka bir güne/saate bırakıldığında
-     * scheduled_at'i doğrudan günceller - hızlı yeniden planlama için.
-     *
-     * DÜZELTME: parent::onEventDrop() eklendi - paketin kendi dokümantasyonu
-     * bu metodları override ederken parent'ın çağrılmaması durumunda "takvimin
-     * düzgün çalışmaya devam etmeyeceğini" açıkça belirtiyor. Önceki hâlde bu
-     * çağrı eksikti - sürükle-bırak veritabanını güncelliyordu ama takvimin
-     * kendisi (JS tarafı) muhtemelen bu yüzden görsel olarak senkronsuz
-     * kalıyordu / event bırakıldığı yerde durmuyordu.
-     */
+    // Dönüş değeri "revert edilsin mi" anlamında - false = kabul et, true = geri al.
     public function onEventDrop(array $event, array $oldEvent, array $relatedEvents, array $delta, ?array $oldResource, ?array $newResource): bool
     {
-        parent::onEventDrop($event, $oldEvent, $relatedEvents, $delta, $oldResource, $newResource);
-
         $item = ContentItem::find($event['id']);
 
         if (!$item || empty($event['start'])) {
-            return false;
+            return true;
         }
 
         $item->update(['scheduled_at' => $event['start']]);
 
-        return true;
+        return false;
     }
 
     private function colorForStatus(mixed $status): string
@@ -129,10 +161,10 @@ class ContentCalendarWidget extends FullCalendarWidget
         $value = $status instanceof \BackedEnum ? $status->value : $status;
 
         return match ($value) {
-            'draft' => '#9ca3af',      // gri
-            'scheduled' => '#f59e0b',  // amber
-            'published' => '#22c55e', // yeşil
-            'archived' => '#ef4444',  // kırmızı
+            'draft' => '#9ca3af',
+            'scheduled' => '#f59e0b',
+            'published' => '#22c55e',
+            'archived' => '#ef4444',
             default => '#9ca3af',
         };
     }
