@@ -11,7 +11,7 @@
             <x-slot name="description">Marka DNA</x-slot>
             <p class="text-sm">Ton, dil, yasaklı kelimeler, tercih edilen hashtag'ler - AI Writer'ın her caption'da uyacağı kurallar burada.</p>
             <x-filament::badge color="success" class="mt-3">Ready</x-filament::badge>
-            <x-filament::button class="mt-4 w-full" tag="a" href="/admin/brand-studio">Brand Studio'ya Git →</x-filament::button>
+            <x-filament::button class="mt-4 w-full" tag="a" :href="\App\Filament\Pages\BrandStudio::getUrl()">Brand Studio'ya Git →</x-filament::button>
         </x-filament::section>
 
         <x-filament::section>

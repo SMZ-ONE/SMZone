@@ -13,8 +13,10 @@ use App\Services\UrlScraperService;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Pages\Page;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
@@ -42,6 +44,7 @@ class AiWriter extends Page implements HasForms
     // persistDraft() içinde meta'ya yazılan bilgi ile tutarlılık sağlar.
     public string $lastFinalName = '';
     public string $lastFinalDesc = '';
+    public string $brandDisplayName = '';
 
     public function mount(): void
     {
@@ -53,10 +56,37 @@ class AiWriter extends Page implements HasForms
             'custom_name' => '',
             'custom_description' => '',
             'platform' => 'instagram',
+            'format' => 'post',
+            'media' => null,
             'tone' => $brand?->tone_default ?? 'professional',
             'lang' => $brand?->lang_default ?? 'de',
             'length' => 'medium',
         ]);
+
+        $this->brandDisplayName = $brand?->name ?? 'bycosmetiq';
+    }
+
+    /**
+     * Canlı önizlemede gösterilecek görsel(ler) - öncelik sırası:
+     * 1) Kullanıcının bu formda yüklediği medya (Storage::url() ile doğru
+     *    disk URL'i üretiliyor - önceden asset('storage/'.$path) kullanılıyordu,
+     *    bu disk ayarına göre yanlış/bozuk URL üretebiliyordu).
+     * 2) Hiç medya yüklenmediyse, seçili üründen (varsa) Shopify görseli.
+     */
+    public function getPreviewImages(): array
+    {
+        $rawMedia = $this->data['media'] ?? null;
+        $paths = is_array($rawMedia) ? array_values($rawMedia) : ($rawMedia ? [$rawMedia] : []);
+
+        if (!empty($paths)) {
+            return array_map(fn ($path) => \Illuminate\Support\Facades\Storage::disk('public')->url($path), $paths);
+        }
+
+        if (!empty($this->data['product_id']) && $product = Product::find($this->data['product_id'])) {
+            return $product->image ? [$product->image] : [];
+        }
+
+        return [];
     }
 
     public function form(Schema $schema): Schema
@@ -113,6 +143,30 @@ class AiWriter extends Page implements HasForms
                 ->options(['instagram'=>'Instagram','tiktok'=>'TikTok','facebook'=>'Facebook'])
                 ->default('instagram')
                 ->required(),
+
+            Select::make('format')
+                ->label('Format')
+                ->options([
+                    'post' => 'Post',
+                    'story' => 'Story',
+                    'reels' => 'Reels',
+                    'carousel' => 'Carousel',
+                ])
+                ->default('post')
+                ->required()
+                ->live()
+                ->native(false),
+
+            FileUpload::make('media')
+                ->label('Media')
+                ->disk('public')
+                ->directory('content-media')
+                ->multiple(fn (Get $get) => $get('format') === 'carousel')
+                ->maxFiles(fn (Get $get) => $get('format') === 'carousel' ? 10 : 1)
+                ->acceptedFileTypes(fn (Get $get) => $get('format') === 'reels' ? ['video/mp4'] : ['image/png', 'image/jpeg', 'image/webp'])
+                ->helperText(fn (Get $get) => $get('format') === 'reels' ? 'Reels için video (mp4)' : ($get('format') === 'carousel' ? 'Carousel için birden fazla görsel (en fazla 10)' : 'Tek görsel'))
+                ->live()
+                ->columnSpanFull(),
 
             Select::make('tone')
                 ->label('Tone')
@@ -307,6 +361,10 @@ class AiWriter extends Page implements HasForms
                 'status' => ContentStatus::Draft->value,
                 'title' => $data['custom_name'] ?: (Product::find($data['product_id'] ?? null)?->name) ?: 'AI Generated',
                 'body' => $this->generated."\n\n".implode(' ', $this->suggestedHashtags),
+                // AiWriter'da yüklenen medya - ContentItem'ın kendi 'media' kolonu zaten
+                // vardı, hiç kullanılmıyordu. EditContentItem'daki yayınlama butonu artık
+                // önce buraya bakacak, yoksa ürün görseline düşecek.
+                'media' => $data['media'] ?? null,
                 'scheduled_at' => now()->addDay(),
                 // EditContentItem::afterSave() -> AiLearningService::logEdit() ileride bu alanları
                 // okuyacak (product_url, custom_description, tone, lang) - burada doldurulmazsa
@@ -318,6 +376,7 @@ class AiWriter extends Page implements HasForms
                     'custom_description' => $this->lastFinalDesc ?: ($data['custom_description'] ?? ''),
                     'tone' => $data['tone'] ?? null,
                     'lang' => $data['lang'] ?? null,
+                    'format' => $data['format'] ?? 'post',
                     'hashtags' => $this->suggestedHashtags,
                 ],
             ]);

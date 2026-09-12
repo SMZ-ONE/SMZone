@@ -6,9 +6,9 @@ use BackedEnum;
 use Filament\Pages\Page;
 use UnitEnum;
 
-class AiCenter extends Page
+class BrandCenter extends Page
 {
-    protected string $view = 'filament.pages.ai-center';
+    protected string $view = 'filament.pages.brand-center';
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-sparkles';
     protected static string|UnitEnum|null $navigationGroup = 'SMZ ONE - Brand';
     protected static ?string $navigationLabel = 'Brand Center';
